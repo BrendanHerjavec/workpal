@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>WorkPal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body, #root { margin:0; padding:0; height:100%; background:transparent; overflow:hidden; font-family: ui-sans-serif, system-ui, sans-serif; -webkit-user-select:none; user-select:none; }
+    .drag { -webkit-app-region: drag; }
+    .no-drag { -webkit-app-region: no-drag; }
+
+    @keyframes idle { 0%,100% { transform: translateY(0) scale(var(--s,1)); } 50% { transform: translateY(-2px) scale(var(--s,1)); } }
+    @keyframes bounce { 0%,100% { transform: translateY(0) scale(var(--s,1)); } 50% { transform: translateY(-8px) scale(calc(var(--s,1) * 1.04)); } }
+    @keyframes droop  { 0%,100% { transform: translateY(2px) scale(var(--s,1)) rotate(-2deg); } 50% { transform: translateY(4px) scale(var(--s,1)) rotate(-2deg); } }
+    @keyframes slump  { 0%,100% { transform: translateY(4px) scale(var(--s,1)) rotate(3deg); } 50% { transform: translateY(5px) scale(var(--s,1)) rotate(3deg); } }
+    @keyframes victory{ 0% { transform: translateY(0) scale(var(--s,1)) rotate(-3deg);} 25%{transform: translateY(-6px) scale(var(--s,1)) rotate(3deg);} 50%{transform: translateY(0) scale(var(--s,1)) rotate(-3deg);} 75%{transform: translateY(-6px) scale(var(--s,1)) rotate(3deg);} 100%{transform: translateY(0) scale(var(--s,1)) rotate(-3deg);} }
+
+    .anim-neutral  { animation: idle 3s ease-in-out infinite; }
+    .anim-happy    { animation: bounce 1.2s ease-in-out infinite; }
+    .anim-sad      { animation: droop 4s ease-in-out infinite; }
+    .anim-dying    { animation: slump 5s ease-in-out infinite; }
+    .anim-thriving { animation: victory 1s ease-in-out infinite; }
+
+    @keyframes confetti { 0% { transform: translate(0,0); opacity:1; } 100% { transform: translate(var(--dx),60px); opacity:0; } }
+    .confetti span { position:absolute; width:4px; height:6px; animation: confetti 1.4s ease-out forwards; }
+
+    @keyframes bubblePop { 0% { transform: scale(0.6); opacity:0;} 15% { transform: scale(1); opacity:1;} 85%{opacity:1;} 100%{opacity:0;}}
+    .bubble { animation: bubblePop 5s ease forwards; }
+
+    @keyframes heartFloat { 0% { transform: translateY(0) scale(0.6); opacity:0; } 20% { opacity:1; transform: translateY(-6px) scale(1); } 100% { transform: translateY(-40px) scale(1.1); opacity:0; } }
+    .heart { animation: heartFloat 1.2s ease-out forwards; }
+
+    @keyframes jiggle { 0%,100% { transform: rotate(0) scale(var(--s,1)); } 25% { transform: rotate(-8deg) scale(calc(var(--s,1)*1.06)); } 75% { transform: rotate(8deg) scale(calc(var(--s,1)*1.06)); } }
+    .jiggle { animation: jiggle 0.3s ease-in-out !important; }
+
+    .cursor-pointer:hover { filter: drop-shadow(0 0 6px rgba(255,255,255,0.4)); }
+    .cursor-pointer:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client"
+    }
+  }
+  </script>
+  <script type="module" src="./renderer.js"></script>
+</body>
+</html>

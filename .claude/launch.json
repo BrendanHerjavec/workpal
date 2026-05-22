@@ -1,0 +1,10 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "workpal-electron",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"]
+    }
+  ]
+}
