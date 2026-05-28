@@ -8,9 +8,42 @@ const e = React.createElement;
 
 function Sprite({ stage, mood, onClick, jiggle }) {
   const html = spriteSVG(stage, mood);
+  const dragState = useRef(null);
+
+  const onMouseDown = useCallback(async (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const [winX, winY] = await window.workpal.getWindowPosition();
+    dragState.current = {
+      startScreenX: ev.screenX,
+      startScreenY: ev.screenY,
+      winX,
+      winY,
+      moved: false
+    };
+    const onMove = (mv) => {
+      const s = dragState.current;
+      if (!s) return;
+      const dx = mv.screenX - s.startScreenX;
+      const dy = mv.screenY - s.startScreenY;
+      if (!s.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+      s.moved = true;
+      window.workpal.setWindowPosition(s.winX + dx, s.winY + dy);
+    };
+    const onUp = (up) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const s = dragState.current;
+      dragState.current = null;
+      if (s && !s.moved) onClick?.(up);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [onClick]);
+
   return e('div', {
-    onClick,
-    onMouseDown: (ev) => ev.stopPropagation(),
+    onMouseDown,
     className: `no-drag anim-${mood} ${jiggle ? 'jiggle' : ''} cursor-pointer`,
     style: { ['--s']: stageScale(stage), width: 128, height: 128, pointerEvents: 'auto' },
     dangerouslySetInnerHTML: { __html: html }
@@ -151,7 +184,8 @@ function App() {
   const [mood, setMood] = useState('neutral');
   const [raw, setRaw] = useState({ unreadEmails:0, overdueTasks:0, todaysCompletedTasks:0, focusMinutes:0 });
   const [stats, setStats] = useState({ goodDays:0, badDaysInARow:0, stage:0, history:[], deathDays:0, lastTickDate:null });
-  const [settings, setSettings] = useState({ alwaysOnTop:true, paused:false, mockMode:true, mock:{ unreadEmails:0, overdueTasks:0, todaysCompletedTasks:0, focusMinutes:0 } });
+  const [settings, setSettings] = useState({ alwaysOnTop:true, paused:false, mockMode:true, demoMode:false, demoCycleSeconds:20, tasksPerEvolve:3, mock:{ unreadEmails:0, overdueTasks:0, todaysCompletedTasks:0, focusMinutes:0 } });
+  const [demoTick, setDemoTick] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [bubble, setBubble] = useState(null);
@@ -213,9 +247,10 @@ function App() {
         return next;
       });
       if (tickRef.current % 5 === 0) refresh();
+      if (settings.demoMode) setDemoTick(t => t + 1);
     }, 1000);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, [refresh, settings.demoMode]);
 
   // Speech bubble + confetti
   useEffect(() => {
@@ -308,18 +343,32 @@ function App() {
       return;
     }
     if (id === 'task') {
+      // Always count toward task-based evolution (demo-friendly).
+      const threshold = Math.max(1, settings.tasksPerEvolve || 3);
+      const cur = (stats.tasksTowardEvolve || 0) + 1;
+      let nextStats;
+      if (cur >= threshold && stats.stage < STAGES.length - 1) {
+        nextStats = { ...stats, stage: stats.stage + 1, tasksTowardEvolve: 0 };
+        setStats(nextStats);
+        await window.workpal.storeSet('stats', nextStats);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 1400);
+        setBubble(`Evolved into ${STAGES[nextStats.stage]}!`);
+        setTimeout(() => setBubble(null), 3000);
+      } else {
+        nextStats = { ...stats, tasksTowardEvolve: cur };
+        setStats(nextStats);
+        await window.workpal.storeSet('stats', nextStats);
+        setBubble(`Task ${cur}/${threshold} toward next stage.`);
+        setTimeout(() => setBubble(null), 2500);
+      }
       if (settings.mockMode) {
         const nextMock = { ...settings.mock, todaysCompletedTasks: (settings.mock.todaysCompletedTasks || 0) + 1 };
         const next = { ...settings, mock: nextMock };
         setSettings(next);
         await window.workpal.storeSet('settings', next);
-        popHearts(2);
-        setBubble('Logged. Proud of you.');
-        setTimeout(() => setBubble(null), 2500);
-      } else {
-        setBubble('Mark it done in Linear too 😉');
-        setTimeout(() => setBubble(null), 2500);
       }
+      popHearts(2);
     }
   }, [onPet, applyBuff, popHearts, settings]);
 
@@ -330,10 +379,14 @@ function App() {
       { id: 'toggle-pause', label: settings.paused ? 'Resume' : 'Pause', type: 'checkbox', checked: settings.paused },
       { id: 'toggle-aot', label: 'Always on top', type: 'checkbox', checked: settings.alwaysOnTop },
       { id: 'toggle-real', label: 'Use real Mail + Reminders', type: 'checkbox', checked: !settings.mockMode },
+      { id: 'toggle-demo', label: `Demo: cycle stages (${settings.demoCycleSeconds || 20}s each)`, type: 'checkbox', checked: !!settings.demoMode },
+      ...[1, 3, 5, 10].map(n => ({ id: `tpe-${n}`, label: `Evolve every ${n} task${n>1?'s':''} (now ${stats.tasksTowardEvolve||0}/${settings.tasksPerEvolve||3})`, type: 'checkbox', checked: (settings.tasksPerEvolve||3) === n })),
       { id: gmailConnected ? 'gmail-disconnect' : 'gmail-connect', label: gmailConnected ? 'Disconnect Gmail' : 'Connect Gmail…' },
       { id: 'toggle-debug', label: 'Debug panel…' },
+      ...STAGES.map((name, i) => ({ id: `set-stage-${i}`, label: `Set stage → ${name}`, type: 'checkbox', checked: stats.stage === i })),
       { id: 'revive', label: 'Revive pet' },
-      { id: 'reset', label: 'Reset save' },
+      { id: 'reset-egg', label: 'Reset to Egg (demo)' },
+      { id: 'reset', label: 'Reset save (full wipe)' },
       { id: 'quit', label: 'Quit' }
     ]);
   };
@@ -374,13 +427,31 @@ function App() {
         setGmailConnected(false);
         setBubble('Gmail disconnected.');
         setTimeout(() => setBubble(null), 2500);
+      } else if (id === 'toggle-demo') {
+        const next = { ...settings, demoMode: !settings.demoMode };
+        setSettings(next); await window.workpal.storeSet('settings', next);
+        setDemoTick(0);
+      } else if (id && id.startsWith('tpe-')) {
+        const n = Number(id.slice(4));
+        const next = { ...settings, tasksPerEvolve: n };
+        setSettings(next); await window.workpal.storeSet('settings', next);
       } else if (id === 'toggle-debug') {
         setShowDebug(true);
+      } else if (id && id.startsWith('set-stage-')) {
+        const stage = Number(id.slice('set-stage-'.length));
+        const next = { ...stats, stage, deathDays: 0 };
+        setStats(next); await window.workpal.storeSet('stats', next);
+      } else if (id === 'reset-egg') {
+        const next = { goodDays:0, badDaysInARow:0, stage:0, history: stats.history || [], deathDays:0, lastTickDate:null, tasksTowardEvolve:0 };
+        setStats(next); await window.workpal.storeSet('stats', next);
+        setDemoTick(0);
+        setBubble('Back to an egg. Demo me.');
+        setTimeout(() => setBubble(null), 2500);
       } else if (id === 'revive') {
         const next = { ...stats, deathDays: 0, stage: Math.max(stats.stage, 1) };
         setStats(next); await window.workpal.storeSet('stats', next);
       } else if (id === 'reset') {
-        const next = { goodDays:0, badDaysInARow:0, stage:0, history:[], deathDays:0, lastTickDate:null };
+        const next = { goodDays:0, badDaysInARow:0, stage:0, history:[], deathDays:0, lastTickDate:null, tasksTowardEvolve:0 };
         setStats(next); await window.workpal.storeSet('stats', next);
       } else if (id === 'quit') {
         window.workpal.quit();
@@ -388,6 +459,12 @@ function App() {
     });
   }, [settings, stats, gmailConnected]);
 
+  let demoStage = stats.stage;
+  if (settings.demoMode) {
+    const cycle = Math.max(2, settings.demoCycleSeconds || 20);
+    const elapsedSec = Math.floor(demoTick);
+    demoStage = Math.floor(elapsedSec / cycle) % STAGES.length;
+  }
   const dead = isDead(stats);
   const sub = subEmotion({
     raw,
@@ -409,7 +486,7 @@ function App() {
     },
     bubble && e(SpeechBubble, { text: bubble }),
     e('div', { className: 'drag flex-1 flex items-center justify-center relative w-full mt-6' },
-      e(Sprite, { stage: stats.stage, mood: displayMood, onClick: onPetClick, jiggle }),
+      e(Sprite, { stage: demoStage, mood: displayMood, onClick: onPetClick, jiggle }),
       e(Hearts, { items: hearts }),
       showConfetti && e(Confetti, null)
     ),

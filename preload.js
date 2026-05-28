@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('workpal', {
   storeSet: (key, val) => ipcRenderer.invoke('store:set', key, val),
   setAlwaysOnTop: (flag) => ipcRenderer.invoke('window:setAlwaysOnTop', flag),
   quit: () => ipcRenderer.invoke('window:quit'),
+  getWindowPosition: () => ipcRenderer.invoke('window:getPosition'),
+  setWindowPosition: (x, y) => ipcRenderer.invoke('window:setPosition', x, y),
   getRealStats: () => ipcRenderer.invoke('real:getStats'),
   gmail: {
     isConnected: () => ipcRenderer.invoke('gmail:isConnected'),

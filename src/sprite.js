@@ -26,16 +26,36 @@ function bodyShape(stage, c) {
   // Returns rects for the creature body silhouette per stage.
   const o = c.outline, b = c.body;
   switch (stage) {
-    case 0: // Egg
-      return [
-        rect(6,3,4,1,o),
-        rect(5,4,6,1,o),
-        rect(4,5,8,1,o),
-        rect(4,6,8,7,b),
-        rect(4,6,1,7,o),
-        rect(11,6,1,7,o),
-        rect(5,13,6,1,o)
-      ].join('');
+    case 0: { // Egg — proper oval with pointed top, rounded bottom
+      // Row layout: [y, leftX, width]
+      const rows = [
+        [2, 7, 2],
+        [3, 6, 4],
+        [4, 5, 6],
+        [5, 5, 6],
+        [6, 4, 8],
+        [7, 4, 8],
+        [8, 4, 8],
+        [9, 4, 8],
+        [10, 4, 8],
+        [11, 4, 8],
+        [12, 5, 6],
+        [13, 6, 4]
+      ];
+      const parts = [];
+      // Fill body
+      for (const [y, x, w] of rows) parts.push(rect(x, y, w, 1, b));
+      // Outline edges
+      for (const [y, x, w] of rows) {
+        parts.push(rect(x, y, 1, 1, o));
+        parts.push(rect(x + w - 1, y, 1, 1, o));
+      }
+      // Speckles for an egg-ish look
+      parts.push(rect(6, 8, 1, 1, c.cheek));
+      parts.push(rect(9, 10, 1, 1, c.cheek));
+      parts.push(rect(7, 6, 1, 1, c.cheek));
+      return parts.join('');
+    }
     case 1: // Blob
       return [
         rect(5,4,6,1,o),

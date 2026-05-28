@@ -12,12 +12,16 @@ const store = new Store({
       stage: 0, // 0=egg, 1=blob, 2=sprout, 3=junior, 4=senior, 5=executive
       history: [], // [{date, score}]
       deathDays: 0,
-      lastTickDate: null
+      lastTickDate: null,
+      tasksTowardEvolve: 0
     },
     settings: {
       alwaysOnTop: true,
       paused: false,
       mockMode: true,
+      demoMode: false,
+      demoCycleSeconds: 20,
+      tasksPerEvolve: 3,
       mock: {
         unreadEmails: 12,
         overdueTasks: 2,
@@ -64,6 +68,8 @@ ipcMain.handle('window:setAlwaysOnTop', (_e, flag) => {
 });
 
 ipcMain.handle('window:quit', () => app.quit());
+ipcMain.handle('window:getPosition', () => win ? win.getPosition() : [0, 0]);
+ipcMain.handle('window:setPosition', (_e, x, y) => { if (win) win.setPosition(Math.round(x), Math.round(y)); });
 ipcMain.handle('real:getStats', () => getMacStats());
 
 ipcMain.handle('gmail:isConnected', () => gmail.isConnected(store));
